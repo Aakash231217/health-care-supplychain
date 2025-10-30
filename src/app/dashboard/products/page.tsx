@@ -16,7 +16,7 @@ export default function ProductsPage() {
 
   // Fetch products using tRPC
   const { data, isLoading } = trpc.product.getAll.useQuery({
-    limit: 50,
+    limit: 1000,
   });
 
   const products = data?.products || [];

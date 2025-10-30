@@ -96,6 +96,11 @@ model Product {
   complianceStatus  ComplianceStatus  @default(PENDING)
   status            ProductStatus     @default(ACTIVE)
   metadata          Json?             // Flexible JSON for additional attributes
+  // Pharmaceutical specific fields
+  activeSubstance   String?
+  pharmaceuticalForm String?
+  concentration     String?
+  quantityRequired  Int?              // Quantity required for 3 years
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
 
@@ -105,6 +110,8 @@ model Product {
   poItems           POItem[]
   qualityChecks     QualityCheck[]
   productHistory    ProductHistory[]
+  vendorPrices      VendorPrice[]
+  importedProducts  ImportedProduct[]
 
   @@index([sku])
   @@index([category])
@@ -140,6 +147,82 @@ enum ComplianceStatus {
 }
 
 // ============================================
+// Vendor Pricing Models
+// ============================================
+
+model VendorPrice {
+  id          String   @id @default(cuid())
+  productId   String
+  vendorId    String
+  price       Float
+  rank        Int      // 1 = First hand, 2 = Second hand, etc.
+  validFrom   DateTime @default(now())
+  validTo     DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  vendor  Vendor  @relation(fields: [vendorId], references: [id])
+
+  @@unique([productId, vendorId, rank])
+  @@index([productId])
+  @@index([vendorId])
+}
+
+// ============================================
+// Import Tracking Models
+// ============================================
+
+model ImportBatch {
+  id              String       @id @default(cuid())
+  fileName        String
+  importType      ImportType
+  totalRecords    Int
+  successRecords  Int
+  failedRecords   Int
+  errors          Json?        // Array of error messages
+  importedBy      String
+  status          ImportStatus @default(PENDING)
+  startedAt       DateTime     @default(now())
+  completedAt     DateTime?
+
+  importedProducts ImportedProduct[]
+
+  @@index([status])
+  @@index([importType])
+}
+
+model ImportedProduct {
+  id          String   @id @default(cuid())
+  batchId     String
+  productId   String?  // null if import failed
+  rowNumber   Int
+  rawData     Json     // Original row data
+  status      String   // SUCCESS, FAILED, DUPLICATE
+  error       String?  // Error message if failed
+  createdAt   DateTime @default(now())
+
+  batch   ImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  product Product?    @relation(fields: [productId], references: [id])
+
+  @@index([batchId])
+  @@index([productId])
+}
+
+enum ImportType {
+  PHARMACEUTICAL_EXCEL
+  CSV_PRODUCTS
+  VENDOR_LIST
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
 // Vendor Management Models
 // ============================================
 
@@ -168,6 +251,7 @@ model Vendor {
   purchaseOrders        PurchaseOrder[]
   shipments             Shipment[]
   vendorPerformance     VendorPerformance[]
+  vendorPrices          VendorPrice[]
 
   @@index([email])
   @@index([status])

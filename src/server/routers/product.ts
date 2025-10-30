@@ -5,7 +5,7 @@ export const productRouter = router({
   getAll: publicProcedure
     .input(
       z.object({
-        limit: z.number().min(1).max(100).default(50),
+        limit: z.number().min(1).max(1000).default(1000),
         cursor: z.string().optional(),
         category: z.string().optional(),
         status: z.enum(['ACTIVE', 'INACTIVE', 'ON_HOLD', 'DISCONTINUED']).optional(),

@@ -4,10 +4,12 @@ import { useState, useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Upload, FileText, X, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Upload, FileText, X, CheckCircle2, AlertCircle, FileSpreadsheet } from 'lucide-react';
 import { trpc } from '@/lib/trpc/client';
 import { useToast } from '@/components/ui/use-toast';
 import * as XLSX from 'xlsx';
+import { ExcelUpload } from './ExcelUpload';
 
 interface ProductUploadModalProps {
   open: boolean;
@@ -30,7 +32,7 @@ export function ProductUploadModal({ open, onClose }: ProductUploadModalProps) {
       setParsedData([]);
       onClose();
     },
-    onError: (error: { message: any; }) => {
+    onError: (error: { message: string }) => {
       toast({
         variant: "destructive",
         title: "Upload failed",
@@ -113,7 +115,7 @@ export function ProductUploadModal({ open, onClose }: ProductUploadModalProps) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl bg-white">
+      <Card className="w-full max-w-4xl max-h-[90vh] bg-white overflow-y-auto">
         <div className="p-6">
           {/* Header */}
           <div className="flex items-center justify-between mb-6">
@@ -123,119 +125,140 @@ export function ProductUploadModal({ open, onClose }: ProductUploadModalProps) {
             </Button>
           </div>
 
-          {/* Upload Area */}
-          {!file ? (
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
-                isDragActive
-                  ? 'border-primary bg-primary/5'
-                  : 'border-gray-300 hover:border-primary'
-              }`}
-            >
-              <input {...getInputProps()} />
-              <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <p className="text-lg font-medium mb-2">
-                {isDragActive ? 'Drop file here' : 'Drag & drop your file here'}
-              </p>
-              <p className="text-sm text-gray-500 mb-4">or click to browse</p>
-              <p className="text-xs text-gray-400">Supports: CSV, XLS, XLSX</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {/* File Info */}
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                <FileText className="h-8 w-8 text-primary" />
-                <div className="flex-1">
-                  <p className="font-medium">{file.name}</p>
-                  <p className="text-sm text-gray-500">
-                    {(file.size / 1024).toFixed(2)} KB
-                  </p>
-                </div>
-                <Button variant="ghost" size="sm" onClick={removeFile}>
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
+          <Tabs defaultValue="pharmaceutical" className="w-full">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="pharmaceutical">
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                Pharmaceutical Excel
+              </TabsTrigger>
+              <TabsTrigger value="general">
+                <Upload className="h-4 w-4 mr-2" />
+                General Products
+              </TabsTrigger>
+            </TabsList>
 
-              {/* Parse Results */}
-              {parsedData.length > 0 ? (
-                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center gap-2 mb-2">
-                    <CheckCircle2 className="h-5 w-5 text-green-600" />
-                    <p className="font-medium text-green-900">
-                      File parsed successfully
+            <TabsContent value="pharmaceutical" className="mt-6">
+              <ExcelUpload />
+            </TabsContent>
+
+            <TabsContent value="general" className="mt-6">
+              <div className="space-y-4">
+                {/* Upload Area */}
+                {!file ? (
+                  <div
+                    {...getRootProps()}
+                    className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
+                      isDragActive
+                        ? 'border-primary bg-primary/5'
+                        : 'border-gray-300 hover:border-primary'
+                    }`}
+                  >
+                    <input {...getInputProps()} />
+                    <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+                    <p className="text-lg font-medium mb-2">
+                      {isDragActive ? 'Drop file here' : 'Drag & drop your file here'}
                     </p>
+                    <p className="text-sm text-gray-500 mb-4">or click to browse</p>
+                    <p className="text-xs text-gray-400">Supports: CSV, XLS, XLSX</p>
                   </div>
-                  <p className="text-sm text-green-700">
-                    {parsedData.length} products ready to upload
-                  </p>
-                  
-                  {/* Preview */}
-                  <div className="mt-4">
-                    <p className="text-sm font-medium mb-2">Preview (first 3 rows):</p>
-                    <div className="bg-white rounded border text-xs overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b">
-                            <th className="text-left p-2">SKU</th>
-                            <th className="text-left p-2">Name</th>
-                            <th className="text-left p-2">Category</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {parsedData.slice(0, 3).map((item, idx) => (
-                            <tr key={idx} className="border-b last:border-0">
-                              <td className="p-2">{item.sku}</td>
-                              <td className="p-2">{item.name}</td>
-                              <td className="p-2">{item.category}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                ) : (
+                  <div className="space-y-4">
+                    {/* File Info */}
+                    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
+                      <FileText className="h-8 w-8 text-primary" />
+                      <div className="flex-1">
+                        <p className="font-medium">{file.name}</p>
+                        <p className="text-sm text-gray-500">
+                          {(file.size / 1024).toFixed(2)} KB
+                        </p>
+                      </div>
+                      <Button variant="ghost" size="sm" onClick={removeFile}>
+                        <X className="h-4 w-4" />
+                      </Button>
                     </div>
-                  </div>
-                </div>
-              ) : (
-                <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-                  <div className="flex items-center gap-2">
-                    <AlertCircle className="h-5 w-5 text-yellow-600" />
-                    <p className="text-sm text-yellow-900">
-                      Parsing file... Please wait
-                    </p>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* Actions */}
-          <div className="flex justify-end gap-2 mt-6">
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              onClick={handleUpload}
-              disabled={parsedData.length === 0 || uploading}
-            >
-              {uploading ? 'Uploading...' : `Upload ${parsedData.length} Products`}
-            </Button>
-          </div>
+                    {/* Parse Results */}
+                    {parsedData.length > 0 ? (
+                      <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <CheckCircle2 className="h-5 w-5 text-green-600" />
+                          <p className="font-medium text-green-900">
+                            File parsed successfully
+                          </p>
+                        </div>
+                        <p className="text-sm text-green-700">
+                          {parsedData.length} products ready to upload
+                        </p>
+                        
+                        {/* Preview */}
+                        <div className="mt-4">
+                          <p className="text-sm font-medium mb-2">Preview (first 3 rows):</p>
+                          <div className="bg-white rounded border text-xs overflow-x-auto">
+                            <table className="w-full">
+                              <thead>
+                                <tr className="border-b">
+                                  <th className="text-left p-2">SKU</th>
+                                  <th className="text-left p-2">Name</th>
+                                  <th className="text-left p-2">Category</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {parsedData.slice(0, 3).map((item, idx) => (
+                                  <tr key={idx} className="border-b last:border-0">
+                                    <td className="p-2">{item.sku}</td>
+                                    <td className="p-2">{item.name}</td>
+                                    <td className="p-2">{item.category}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-5 w-5 text-yellow-600" />
+                          <p className="text-sm text-yellow-900">
+                            Parsing file... Please wait
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
 
-          {/* Instructions */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm font-medium text-blue-900 mb-2">
-              Required columns:
-            </p>
-            <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
-              <li>SKU - Unique product identifier</li>
-              <li>Name - Product name</li>
-              <li>Category - Product category</li>
-              <li>UnitOfMeasure - Unit (e.g., Box, Unit, Bottle)</li>
-            </ul>
-            <p className="text-xs text-blue-700 mt-2">
-              Optional: Description, SubCategory, ReorderPoint, LeadTime
-            </p>
-          </div>
+                {/* Actions */}
+                <div className="flex justify-end gap-2 mt-6">
+                  <Button variant="outline" onClick={onClose}>
+                    Cancel
+                  </Button>
+                  <Button
+                    onClick={handleUpload}
+                    disabled={parsedData.length === 0 || uploading}
+                  >
+                    {uploading ? 'Uploading...' : `Upload ${parsedData.length} Products`}
+                  </Button>
+                </div>
+
+                {/* Instructions */}
+                <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm font-medium text-blue-900 mb-2">
+                    Required columns:
+                  </p>
+                  <ul className="text-xs text-blue-700 space-y-1 list-disc list-inside">
+                    <li>SKU - Unique product identifier</li>
+                    <li>Name - Product name</li>
+                    <li>Category - Product category</li>
+                    <li>UnitOfMeasure - Unit (e.g., Box, Unit, Bottle)</li>
+                  </ul>
+                  <p className="text-xs text-blue-700 mt-2">
+                    Optional: Description, SubCategory, ReorderPoint, LeadTime
+                  </p>
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </Card>
     </div>
