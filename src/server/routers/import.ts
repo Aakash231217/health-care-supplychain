@@ -28,27 +28,83 @@ export const importRouter = router({
       });
 
       try {
-        // Save file temporarily
-        const tempDir = path.join(process.cwd(), 'temp');
-        if (!fs.existsSync(tempDir)) {
-          fs.mkdirSync(tempDir, { recursive: true });
+        // Save file temporarily in /tmp directory (writable in serverless)
+        const tempDir = '/tmp';
+        // Create a subdirectory for our uploads if it doesn't exist
+        const uploadDir = path.join(tempDir, 'healthcare-uploads');
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
         }
         
-        const tempFilePath = path.join(tempDir, `upload_${Date.now()}_${input.fileName}`);
+        const tempFilePath = path.join(uploadDir, `upload_${Date.now()}_${input.fileName}`);
         const fileBuffer = Buffer.from(input.fileContent, 'base64');
         fs.writeFileSync(tempFilePath, fileBuffer);
 
-        // Parse the Excel file
+        // Check if file needs chunked processing
         const parser = new PharmaceuticalExcelParser(tempFilePath);
-        const { transformedProducts, errors } = await parser.parse();
-
+        const fileInfo = await parser.needsChunkedProcessing();
+        
+        console.log(`Processing file: ${input.fileName}, Size: ${fileInfo.fileSize.toFixed(2)}MB, Estimated rows: ${fileInfo.estimatedRows}`);
+        
         let successCount = 0;
         let failureCount = 0;
-        const importResults = [];
-
-        // Process each product
-        for (let i = 0; i < transformedProducts.length; i++) {
-          const product = transformedProducts[i];
+        let totalErrors: string[] = [];
+        
+        // Process file based on size
+        if (fileInfo.recommendChunking) {
+          // Process large files in chunks
+          console.log('Using chunked processing for large file');
+          
+          await parser.parseChunked(async (chunk) => {
+            console.log(`Processing chunk: ${chunk.products.length} products, Progress: ${chunk.progress.toFixed(1)}%`);
+            totalErrors.push(...chunk.errors);
+            
+            // Process products in this chunk with batch operations
+            const batchSize = 10; // Process 10 products at a time
+            for (let i = 0; i < chunk.products.length; i += batchSize) {
+              const batch = chunk.products.slice(i, i + batchSize);
+              
+              // Process batch in parallel
+              const results = await Promise.all(
+                batch.map(async (product, idx) => {
+                  try {
+                    return await processProduct(ctx, product, importBatch.id, i + idx);
+                  } catch (error) {
+                    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+                  }
+                })
+              );
+              
+              // Count successes and failures
+              results.forEach(result => {
+                if (result.success) {
+                  successCount++;
+                } else {
+                  failureCount++;
+                }
+              });
+            }
+            
+            // Update progress periodically
+            if (chunk.progress % 10 === 0) {
+              await ctx.db.importBatch.update({
+                where: { id: importBatch.id },
+                data: {
+                  totalRecords: fileInfo.estimatedRows,
+                  successRecords: successCount,
+                  failedRecords: failureCount,
+                },
+              });
+            }
+          });
+        } else {
+          // Process smaller files normally
+          const { transformedProducts, errors } = await parser.parse();
+          totalErrors = errors;
+          
+          // Process each product
+          for (let i = 0; i < transformedProducts.length; i++) {
+            const product = transformedProducts[i];
           
           try {
             // Check if product already exists
@@ -131,16 +187,17 @@ export const importRouter = router({
               },
             });
           }
+          }
         }
-
+        
         // Update import batch with results
         await ctx.db.importBatch.update({
           where: { id: importBatch.id },
           data: {
-            totalRecords: transformedProducts.length,
+            totalRecords: successCount + failureCount,
             successRecords: successCount,
             failedRecords: failureCount,
-            errors: errors.length > 0 ? errors : undefined,
+            errors: totalErrors.length > 0 ? totalErrors : undefined,
             status: ImportStatus.COMPLETED,
             completedAt: new Date(),
           },
@@ -152,10 +209,10 @@ export const importRouter = router({
         return {
           success: true,
           batchId: importBatch.id,
-          totalRecords: transformedProducts.length,
+          totalRecords: successCount + failureCount,
           successRecords: successCount,
           failedRecords: failureCount,
-          errors: errors.slice(0, 10), // Return first 10 errors
+          errors: totalErrors.slice(0, 10), // Return first 10 errors
         };
         
       } catch (error) {
@@ -228,6 +285,100 @@ export const importRouter = router({
       return batch;
     }),
 });
+
+// Helper function to process a single product
+async function processProduct(
+  ctx: any,
+  product: any,
+  batchId: string,
+  rowNumber: number
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Check if product already exists
+    const existingProduct = await ctx.db.product.findUnique({
+      where: { sku: product.sku },
+    });
+
+    if (existingProduct) {
+      // Update existing product
+      const updatedProduct = await ctx.db.product.update({
+        where: { sku: product.sku },
+        data: {
+          name: product.name,
+          description: product.description,
+          category: product.category,
+          unitOfMeasure: product.unitOfMeasure,
+          activeSubstance: product.activeSubstance,
+          pharmaceuticalForm: product.pharmaceuticalForm,
+          concentration: product.concentration,
+          quantityRequired: product.quantityRequired,
+          updatedAt: new Date(),
+        },
+      });
+
+      // Update vendor prices
+      await updateVendorPrices(ctx.db, updatedProduct.id, product.vendors);
+      
+      await ctx.db.importedProduct.create({
+        data: {
+          batchId,
+          productId: updatedProduct.id,
+          rowNumber: rowNumber + 2,
+          rawData: product as any,
+          status: 'UPDATED',
+        },
+      });
+      
+      return { success: true };
+    } else {
+      // Create new product
+      const newProduct = await ctx.db.product.create({
+        data: {
+          sku: product.sku,
+          name: product.name,
+          description: product.description,
+          category: product.category,
+          unitOfMeasure: product.unitOfMeasure,
+          activeSubstance: product.activeSubstance,
+          pharmaceuticalForm: product.pharmaceuticalForm,
+          concentration: product.concentration,
+          quantityRequired: product.quantityRequired,
+          status: 'ACTIVE',
+        },
+      });
+
+      // Create vendor prices
+      await updateVendorPrices(ctx.db, newProduct.id, product.vendors);
+      
+      await ctx.db.importedProduct.create({
+        data: {
+          batchId,
+          productId: newProduct.id,
+          rowNumber: rowNumber + 2,
+          rawData: product as any,
+          status: 'SUCCESS',
+        },
+      });
+      
+      return { success: true };
+    }
+  } catch (error) {
+    await ctx.db.importedProduct.create({
+      data: {
+        batchId,
+        rowNumber: rowNumber + 2,
+        rawData: product as any,
+        status: 'FAILED',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      },
+    });
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    };
+  }
+}
 
 // Helper function to update vendor prices
 async function updateVendorPrices(
