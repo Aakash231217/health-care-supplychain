@@ -7,16 +7,14 @@ async function listAvailableMedicines() {
     console.log('🔍 Fetching available medicines from Latvia Registry...\n');
 
     // Get unique active substances with drug examples
-    const latviaRegistries = await prisma.latviaPharmacy.findMany({
+    const latviaRegistries = await prisma.latviaPharmaRegistry.findMany({
       select: {
-        activeSubstance: true,
+        activeIngredient: true,
         drugName: true,
         dosageForm: true,
-        concentration: true,
       },
-      distinct: ['activeSubstance'],
       orderBy: {
-        activeSubstance: 'asc'
+        activeIngredient: 'asc'
       },
       take: 50, // Show first 50 unique active substances
     });
@@ -28,8 +26,8 @@ async function listAvailableMedicines() {
     const grouped: { [key: string]: typeof latviaRegistries } = {};
     
     latviaRegistries.forEach(entry => {
-      if (entry.activeSubstance) {
-        const firstLetter = entry.activeSubstance.charAt(0).toUpperCase();
+      if (entry.activeIngredient) {
+        const firstLetter = entry.activeIngredient.charAt(0).toUpperCase();
         if (!grouped[firstLetter]) {
           grouped[firstLetter] = [];
         }
@@ -41,8 +39,8 @@ async function listAvailableMedicines() {
     Object.keys(grouped).sort().forEach(letter => {
       console.log(`\n--- ${letter} ---`);
       grouped[letter].forEach(entry => {
-        console.log(`• ${entry.activeSubstance}`);
-        console.log(`  Example: ${entry.drugName} (${entry.dosageForm}${entry.concentration ? ', ' + entry.concentration : ''})`);
+        console.log(`• ${entry.activeIngredient}`);
+        console.log(`  Example: ${entry.drugName} (${entry.dosageForm})`);
       });
     });
 
@@ -61,9 +59,9 @@ async function listAvailableMedicines() {
     console.log('\n\n📌 Popular Active Substances You Can Search:');
     
     for (const substance of popularSubstances) {
-      const count = await prisma.latviaPharmacy.count({
+      const count = await prisma.latviaPharmaRegistry.count({
         where: {
-          activeSubstance: {
+          activeIngredient: {
             contains: substance,
             mode: 'insensitive'
           }
@@ -71,9 +69,9 @@ async function listAvailableMedicines() {
       });
       
       if (count > 0) {
-        const examples = await prisma.latviaPharmacy.findMany({
+        const examples = await prisma.latviaPharmaRegistry.findMany({
           where: {
-            activeSubstance: {
+            activeIngredient: {
               contains: substance,
               mode: 'insensitive'
             }
@@ -81,7 +79,7 @@ async function listAvailableMedicines() {
           select: {
             drugName: true,
             dosageForm: true,
-            wholesaler: true,
+            wholesalerName: true,
           },
           distinct: ['drugName'],
           take: 3
@@ -89,16 +87,16 @@ async function listAvailableMedicines() {
         
         console.log(`\n${substance} - ${count} products available`);
         examples.forEach(ex => {
-          console.log(`  • ${ex.drugName} (${ex.dosageForm}) - from ${ex.wholesaler}`);
+          console.log(`  • ${ex.drugName} (${ex.dosageForm}) - from ${ex.wholesalerName}`);
         });
       }
     }
 
     // Get total counts
-    const totalProducts = await prisma.latviaPharmacy.count();
-    const uniqueSubstances = await prisma.latviaPharmacy.findMany({
-      select: { activeSubstance: true },
-      distinct: ['activeSubstance'],
+    const totalProducts = await prisma.latviaPharmaRegistry.count();
+    const uniqueSubstances = await prisma.latviaPharmaRegistry.findMany({
+      select: { activeIngredient: true },
+      distinct: ['activeIngredient'],
     });
 
     console.log('\n\n📊 Summary:');

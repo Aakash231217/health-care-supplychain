@@ -352,7 +352,7 @@ export const productRouter = router({
           ...(input.includeRecommendations && { recommendations: result.aiInsights.recommendations }),
           summary: result.aiInsights.summary,
           warnings: result.aiInsights.warnings,
-          nextSteps: result.aiInsights.nextSteps,
+          nextSteps: (result.aiInsights as any).nextSteps,
         },
         searchMetadata: result.searchMetadata,
       };

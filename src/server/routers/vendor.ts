@@ -188,7 +188,7 @@ export const vendorRouter = router({
         const researcher = new VendorResearcher();
         const intelligenceData = await researcher.researchVendor({
           vendorName: vendor.name,
-          existingWebsite: vendor.address ? undefined : vendor.address,
+          existingWebsite: vendor.address || undefined,
           existingEmail: vendor.email,
         });
 

@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, Prisma } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -29,10 +29,8 @@ async function checkProductFields() {
     // Check if any products have activeSubstance
     const productsWithActiveSubstance = await prisma.product.count({
       where: {
-        NOT: {
-          metadata: {
-            equals: null
-          }
+        metadata: {
+          not: Prisma.DbNull
         }
       }
     });

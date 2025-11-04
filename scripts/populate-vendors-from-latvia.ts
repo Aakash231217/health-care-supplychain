@@ -94,7 +94,8 @@ async function populateVendorsFromLatvia() {
         }
       } catch (error) {
         skipped++;
-        console.log(`✗ Skipped ${wholesaler.wholesalerName}: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.log(`✗ Skipped ${wholesaler.wholesalerName}: ${errorMessage}`);
       }
     }
 

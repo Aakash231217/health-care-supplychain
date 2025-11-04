@@ -163,7 +163,7 @@ export function LatviaWholesalersTable() {
                         onClick={() =>
                           handleResearch(wholesaler.wholesalerName, wholesaler.wholesalerAddress)
                         }
-                        disabled={researchMutation.isLoading}
+                        disabled={researchMutation.isPending}
                         className="gap-2"
                       >
                         <Search className="h-3 w-3" />
