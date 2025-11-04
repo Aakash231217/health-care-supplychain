@@ -1,5 +1,7 @@
 import { z } from 'zod';
 import { router, publicProcedure } from '../trpc';
+import { VendorResearcher } from '@/lib/vendor-researcher';
+import { TRPCError } from '@trpc/server';
 
 export const vendorRouter = router({
   getAll: publicProcedure
@@ -21,6 +23,9 @@ export const vendorRouter = router({
         cursor: cursor ? { id: cursor } : undefined,
         orderBy: {
           createdAt: 'desc',
+        },
+        include: {
+          purchaseOrders: true,
         },
       });
 
@@ -125,6 +130,189 @@ export const vendorRouter = router({
           avgQualityRating: avgQualityRating || 0,
           totalOrders,
         },
+      };
+    }),
+
+  // Vendor Intelligence & Research
+  researchVendor: publicProcedure
+    .input(
+      z.object({
+        vendorId: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        // Get vendor details
+        const vendor = await ctx.db.vendor.findUnique({
+          where: { id: input.vendorId },
+        });
+
+        if (!vendor) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Vendor not found',
+          });
+        }
+
+        // Check if research already exists and is recent (< 30 days)
+        const existingIntelligence = await ctx.db.vendorIntelligence.findUnique({
+          where: { vendorId: input.vendorId },
+        });
+
+        if (
+          existingIntelligence &&
+          existingIntelligence.researchStatus === 'COMPLETED' &&
+          existingIntelligence.lastResearchedAt &&
+          Date.now() - existingIntelligence.lastResearchedAt.getTime() < 30 * 24 * 60 * 60 * 1000
+        ) {
+          return {
+            intelligence: existingIntelligence,
+            message: 'Using cached research data (< 30 days old)',
+          };
+        }
+
+        // Update status to IN_PROGRESS
+        await ctx.db.vendorIntelligence.upsert({
+          where: { vendorId: input.vendorId },
+          create: {
+            vendorId: input.vendorId,
+            researchStatus: 'IN_PROGRESS',
+          },
+          update: {
+            researchStatus: 'IN_PROGRESS',
+            researchError: null,
+          },
+        });
+
+        // Perform research
+        const researcher = new VendorResearcher();
+        const intelligenceData = await researcher.researchVendor({
+          vendorName: vendor.name,
+          existingWebsite: vendor.address ? undefined : vendor.address,
+          existingEmail: vendor.email,
+        });
+
+        // Save intelligence to database
+        const intelligence = await ctx.db.vendorIntelligence.upsert({
+          where: { vendorId: input.vendorId },
+          create: {
+            vendorId: input.vendorId,
+            ...intelligenceData,
+            researchStatus: 'COMPLETED',
+            lastResearchedAt: new Date(),
+          },
+          update: {
+            ...intelligenceData,
+            researchStatus: 'COMPLETED',
+            lastResearchedAt: new Date(),
+            researchError: null,
+          },
+        });
+
+        return {
+          intelligence,
+          message: 'Vendor research completed successfully',
+        };
+      } catch (error) {
+        // Save error status
+        await ctx.db.vendorIntelligence.upsert({
+          where: { vendorId: input.vendorId },
+          create: {
+            vendorId: input.vendorId,
+            researchStatus: 'FAILED',
+            researchError: error instanceof Error ? error.message : 'Unknown error',
+          },
+          update: {
+            researchStatus: 'FAILED',
+            researchError: error instanceof Error ? error.message : 'Unknown error',
+          },
+        });
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: `Vendor research failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        });
+      }
+    }),
+
+  getVendorIntelligence: publicProcedure
+    .input(z.object({ vendorId: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const intelligence = await ctx.db.vendorIntelligence.findUnique({
+        where: { vendorId: input.vendorId },
+        include: {
+          vendor: {
+            select: {
+              name: true,
+              email: true,
+              address: true,
+            },
+          },
+        },
+      });
+
+      return intelligence;
+    }),
+
+  // Batch research multiple vendors
+  batchResearchVendors: publicProcedure
+    .input(
+      z.object({
+        vendorIds: z.array(z.string()).max(10), // Limit to 10 at a time
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const results = [];
+
+      for (const vendorId of input.vendorIds) {
+        try {
+          const vendor = await ctx.db.vendor.findUnique({
+            where: { id: vendorId },
+          });
+
+          if (!vendor) continue;
+
+          const researcher = new VendorResearcher();
+          const intelligenceData = await researcher.researchVendor({
+            vendorName: vendor.name,
+            existingEmail: vendor.email,
+          });
+
+          const intelligence = await ctx.db.vendorIntelligence.upsert({
+            where: { vendorId },
+            create: {
+              vendorId,
+              ...intelligenceData,
+              researchStatus: 'COMPLETED',
+              lastResearchedAt: new Date(),
+            },
+            update: {
+              ...intelligenceData,
+              researchStatus: 'COMPLETED',
+              lastResearchedAt: new Date(),
+            },
+          });
+
+          results.push({
+            vendorId,
+            vendorName: vendor.name,
+            status: 'SUCCESS',
+            classification: intelligence.supplierClassification,
+          });
+        } catch (error) {
+          results.push({
+            vendorId,
+            status: 'FAILED',
+            error: error instanceof Error ? error.message : 'Unknown error',
+          });
+        }
+      }
+
+      return {
+        total: input.vendorIds.length,
+        successful: results.filter((r) => r.status === 'SUCCESS').length,
+        failed: results.filter((r) => r.status === 'FAILED').length,
+        results,
       };
     }),
 });

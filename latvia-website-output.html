@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="lv" class="h-100">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="X-UA-Compatible" content="IE=edge"/>
+<title>Gada atļaujas nereģistrēto zāļu izplatīšanai</title>
+
+<link rel="stylesheet" href="https://dati.zva.gov.lv/assets/bootstrap/css/bootstrap.min.css"/>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Open+Sans:300,400,600,700&amp;subset=cyrillic,latin-ext" media="all"/>
+<link href="https://dati.zva.gov.lv/assets/open-iconic/font/css/open-iconic-bootstrap.min.css" rel="stylesheet"/>
+
+<link rel="stylesheet" href="https://dati.zva.gov.lv/assets/style-ng.css?413"/>
+
+</head>
+<body class="d-flex flex-column h-100 width-wider font-smaller">
+<a class="sr-only sr-only-focusable" href="#main-content">Pārlēkt uz galveno saturu</a>
+
+<header>
+  
+  <nav class="header-top" aria-label="Header navigation">
+    <div class="container text-right">
+      <a class="mr-3 d-inline-block" href="https://dati.zva.gov.lv/">ZVA IS<span class='d-none d-sm-inline'> dati</span></a>
+      <a class="mr-5 d-inline-block" href="https://www.zva.gov.lv/" target="_blank">www.zva.gov.lv</a>
+
+      <!-- <a class="mr-2 d-inline-block lang active" href="https://dati.zva.gov.lv/zr-n-permissions/" title="Latviski">LV</a> -->
+      <!-- <a class="mr-1 d-inline-block lang" href="https://dati.zva.gov.lv/zr-n-permissions/en" title="English">EN</a> -->
+    </div>
+  </nav>
+</header>
+
+<main role="main" class="zvais-module">
+<div class="container mt-2">
+<a id="main-content"></a>
+  
+<h1 class="page-title mb-4 h3"><a href="https://dati.zva.gov.lv/zr-n-permissions/">Gada atļaujas nereģistrēto zāļu izplatīšanai</a></h1>
+
+
+<form method="get" action="" id="filter">
+<p>Saraksts ar izsniegtajām gada atļaujām saskaņā ar Ministru kabineta 2007. gada 26. jūnija noteikumu Nr. 416 “Zāļu izplatīšanas un kvalitātes kontroles kārtība” 149.11. un 149.12. apakšpunktu.</p>
+
+<div class="row">
+  <div class="col">
+    <label for="q"><strong>Zāļu nosaukums, ražotājs, lieltirgotava, identifikācijas numurs</strong></label>
+    <input type="search" class="form-control" name="q" id="q" placeholder="Zāļu nosaukums, ražotājs, lieltirgotava, identifikācijas numurs" value="" autocomplete="on"/>
+  </div>
+</div>
+
+
+<div class="form-row my-2">
+  <div class="col text-left">
+      </div>
+  <div class="col text-right">
+    <input type="submit" class="btn btn-secondary" name="iss" value="Meklēt"/>
+    <input type="reset" class="btn btn-light" value="Attīrīt formu" onclick="window.location.href='https://dati.zva.gov.lv/zr-n-permissions/'; return false;"/> 
+    <input type="hidden" id="iss" value="0"/>
+  </div>
+</div>
+
+
+</form>
+
+
+<div id="api-list"></div>
+<div class="notice notice-failure" id="api-err"></div>
+
+
+</div>
+</main>
+
+<script src="https://dati.zva.gov.lv/assets/jquery.js"></script>
+<script src="https://dati.zva.gov.lv/assets/popper.min.js"></script>
+<script src="https://dati.zva.gov.lv/assets/bootstrap/js/bootstrap.min.js"></script>
+
+
+<script>
+var ZEB_LANG = "lv";
+var ZEB_SITEROOT = "https://dati.zva.gov.lv/zr-n-permissions";
+var ZVAISDATA_SITEROOT = "https://dati.zva.gov.lv";
+</script>
+  <script type="text/plain" data-category="analytics" defer src="https://kaste.zva.gov.lv/script.js" data-website-id="3ff8ba35-2bc2-4847-a20f-01f62e04fc82"></script>
+    <script type="module" src="https://dati.zva.gov.lv/assets/cookieconsent/cookieconsent-config.js"></script>
+  <script>
+  window.addEventListener("load", function() {
+    var css = document.createElement('link');
+    css.rel = 'stylesheet';
+    css.href = 'https://dati.zva.gov.lv/assets/cookieconsent/cookieconsent.css';
+    document.head.appendChild(css);
+  });
+  </script>
+
+  <footer class="footer mt-auto py-3">
+    <div class="container small text-right">
+      <hr/>
+      <span class="oi oi-cog"></span>
+      <a href="#" data-cc="show-preferencesModal">Sīkdatņu iestatījumi</a>
+    </div>
+  </footer>  
+  <script src="https://dati.zva.gov.lv/assets/common.js"></script>
+<script src="https://dati.zva.gov.lv/zr-n-permissions/assets/common.js?414"></script>
+
+<footer class="footer mt-auto py-3">
+  <a href="#" class="btn btn-secondary scroll-top" data-scroll="up" aria-label="scroll up">
+    <span class="oi oi-data-transfer-upload mt-2"></span>
+  </a>
+
+  <div class="container">
+    <span class="text-muted">© 2025 Zāļu valsts aģentūra</span>
+  </div>
+</footer>
+
+<!--
+  Code by [hidden], 2025
+-->
+
+</body>
+</html>

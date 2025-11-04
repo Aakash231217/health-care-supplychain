@@ -6,36 +6,28 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Users, Search, Plus, ArrowLeft, Star } from "lucide-react";
+import { Users, Search, Plus, ArrowLeft, Star, Loader2 } from "lucide-react";
+import { trpc } from "@/lib/trpc/client";
 
 export default function VendorsPage() {
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Mock data - will be replaced with tRPC query
-  const vendors = [
-    {
-      id: '1',
-      name: 'MediSupply Inc.',
-      email: 'contact@medisupply.com',
-      phone: '+1-555-0123',
-      performanceRating: 4.5,
-      qualityScore: 92,
-      status: 'ACTIVE',
-      totalOrders: 145,
-    },
-    {
-      id: '2',
-      name: 'Healthcare Solutions Ltd',
-      email: 'sales@healthcaresol.com',
-      phone: '+1-555-0456',
-      performanceRating: 4.8,
-      qualityScore: 96,
-      status: 'ACTIVE',
-      totalOrders: 203,
-    },
-  ];
+  // Fetch vendors from database using TRPC
+  const { data, isLoading, error } = trpc.vendor.getAll.useQuery({
+    limit: 100,
+  });
 
-  const filteredVendors = vendors.filter((vendor) =>
+  const vendors = data?.vendors || [];
+
+  // Count purchase orders for each vendor (using vendorPrices as proxy for now)
+  const vendorsWithOrders = vendors.map(vendor => ({
+    ...vendor,
+    totalOrders: vendor.purchaseOrders?.length || 0,
+    performanceRating: vendor.performanceRating || 0,
+    qualityScore: vendor.qualityScore ? Math.round(vendor.qualityScore * 20) : 0, // Convert 0-5 to percentage
+  }));
+
+  const filteredVendors = vendorsWithOrders.filter((vendor) =>
     vendor.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     vendor.email.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -68,9 +60,9 @@ export default function VendorsPage() {
       <main className="flex-1">
         <div className="container mx-auto px-4 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <StatCard title="Total Vendors" value="56" trend="+3 this month" />
-            <StatCard title="Avg Performance" value="4.6/5" trend="⭐ Excellent" />
-            <StatCard title="Active Orders" value="127" trend="18 pending quotes" />
+            <StatCard title="Total Vendors" value={vendors.length.toString()} trend={`${vendors.filter(v => v.status === 'ACTIVE').length} active`} />
+            <StatCard title="Avg Performance" value={`${(vendorsWithOrders.reduce((sum, v) => sum + v.performanceRating, 0) / vendorsWithOrders.length || 0).toFixed(1)}/5`} trend="⭐ Performance" />
+            <StatCard title="With Certifications" value={vendors.filter(v => v.certifications).length.toString()} trend="Verified suppliers" />
           </div>
 
           <Card className="mb-6">
@@ -98,57 +90,86 @@ export default function VendorsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Vendor Name</TableHead>
-                    <TableHead>Contact</TableHead>
-                    <TableHead>Performance</TableHead>
-                    <TableHead>Quality Score</TableHead>
-                    <TableHead>Total Orders</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Actions</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {filteredVendors.map((vendor) => (
-                    <TableRow key={vendor.id}>
-                      <TableCell className="font-medium">{vendor.name}</TableCell>
-                      <TableCell>
-                        <div className="text-sm">
-                          <div>{vendor.email}</div>
-                          <div className="text-gray-500">{vendor.phone}</div>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                          <span className="font-medium">{vendor.performanceRating}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-2">
-                          <div className="w-full bg-gray-200 rounded-full h-2 max-w-[60px]">
-                            <div 
-                              className="bg-green-600 h-2 rounded-full" 
-                              style={{ width: `${vendor.qualityScore}%` }}
-                            />
-                          </div>
-                          <span className="text-sm">{vendor.qualityScore}%</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>{vendor.totalOrders}</TableCell>
-                      <TableCell>
-                        <StatusBadge status={vendor.status} />
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Button variant="ghost" size="sm">View</Button>
-                        <Button variant="ghost" size="sm">Edit</Button>
-                      </TableCell>
+              {isLoading ? (
+                <div className="flex items-center justify-center p-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+                </div>
+              ) : error ? (
+                <div className="text-center p-8 text-red-600">
+                  Error loading vendors: {error.message}
+                </div>
+              ) : filteredVendors.length === 0 ? (
+                <div className="text-center p-8 text-gray-500">
+                  {searchTerm ? 'No vendors found matching your search.' : 'No vendors found. Click "Add Vendor" to create one.'}
+                </div>
+              ) : (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Vendor Name</TableHead>
+                      <TableHead>Contact</TableHead>
+                      <TableHead>Performance</TableHead>
+                      <TableHead>Quality Score</TableHead>
+                      <TableHead>Certifications</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredVendors.map((vendor) => (
+                      <TableRow key={vendor.id}>
+                        <TableCell className="font-medium">{vendor.name}</TableCell>
+                        <TableCell>
+                          <div className="text-sm">
+                            <div>{vendor.email}</div>
+                            <div className="text-gray-500">{vendor.phone || 'No phone'}</div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                            <span className="font-medium">{vendor.performanceRating.toFixed(1)}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <div className="w-full bg-gray-200 rounded-full h-2 max-w-[60px]">
+                              <div 
+                                className="bg-green-600 h-2 rounded-full" 
+                                style={{ width: `${vendor.qualityScore}%` }}
+                              />
+                            </div>
+                            <span className="text-sm">{vendor.qualityScore}%</span>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {vendor.certifications ? (
+                            <div className="text-sm">
+                              <span className="font-medium text-green-600">✓ Verified</span>
+                              {(vendor.certifications as any)?.latviaLicense && (
+                                <div className="text-xs text-gray-500">
+                                  {(vendor.certifications as any).latviaLicense}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="text-sm text-gray-400">None</span>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <StatusBadge status={vendor.status} />
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Link href={`/dashboard/vendors/${vendor.id}`}>
+                            <Button variant="ghost" size="sm">View</Button>
+                          </Link>
+                          <Button variant="ghost" size="sm">Edit</Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
             </CardContent>
           </Card>
         </div>

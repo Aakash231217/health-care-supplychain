@@ -7,7 +7,8 @@ import {
   FileText, 
   TruckIcon, 
   BarChart3,
-  PlusCircle 
+  PlusCircle,
+  Pill 
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -111,6 +112,13 @@ export default function DashboardPage() {
                 icon={<PlusCircle className="h-8 w-8" />}
                 href="/dashboard/purchase-orders"
                 color="pink"
+              />
+              <ActionCard
+                title="Latvia Registry"
+                description="Browse pharmaceutical data from Latvia"
+                icon={<Pill className="h-8 w-8" />}
+                href="/dashboard/latvia-registry"
+                color="green"
               />
             </div>
           </div>

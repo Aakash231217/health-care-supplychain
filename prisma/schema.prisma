@@ -252,9 +252,63 @@ model Vendor {
   shipments             Shipment[]
   vendorPerformance     VendorPerformance[]
   vendorPrices          VendorPrice[]
+  intelligence          VendorIntelligence?
 
   @@index([email])
   @@index([status])
+}
+
+model VendorIntelligence {
+  id                     String   @id @default(cuid())
+  vendorId               String   @unique
+  vendor                 Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  
+  // Company Profile
+  businessType           String?  // "Manufacturer", "Wholesaler", "Distributor", "Retailer"
+  companySize            String?  // "Enterprise", "Mid-size", "Small"
+  employeeCount          Int?
+  annualRevenue          Float?
+  yearsInBusiness        Int?
+  
+  // Order Capacity
+  minimumOrderQty        Int?
+  typicalOrderSize       String?  // "Bulk (>10K units)", "Medium (1K-10K)", "Small (<1K)"
+  orderCapacityScore     Int?     // 1-10 scale
+  
+  // Market Presence
+  numberOfLocations      Int?
+  geographicCoverage     String?  // "Local", "Regional", "International"
+  primaryClientTypes     String[] // ["Hospitals", "Clinics", "Pharmacies"]
+  
+  // Compliance
+  certificationsFound    String[] // ["ISO 9001", "GDP", "GMP"]
+  licenseStatus          String?  // "Valid", "Expired", "Pending"
+  
+  // Performance
+  averageDeliveryDays    Int?
+  reliabilityScore       Float?   // 0-5 stars
+  customerReviewCount    Int?
+  
+  // Classification
+  supplierClassification String?  // "Bulk Supplier", "Mid-size Distributor", "Small Retailer"
+  classificationScore    Int?     // -10 to +10
+  
+  // Meta
+  officialWebsite        String?
+  linkedinUrl            String?
+  dataSource             String?  // "Website,LinkedIn,GoogleSearch"
+  rawData                Json?    // Store raw scraped data
+  lastResearchedAt       DateTime?
+  confidenceScore        Float?   // 0-1, how confident we are in the data
+  researchStatus         String   @default("PENDING") // "PENDING", "IN_PROGRESS", "COMPLETED", "FAILED"
+  researchError          String?  @db.Text
+  
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  @@index([vendorId])
+  @@index([supplierClassification])
+  @@index([researchStatus])
 }
 
 model VendorPerformance {
@@ -613,4 +667,31 @@ model AuditLog {
   @@index([userId])
   @@index([entity, entityId])
   @@index([timestamp])
+}
+
+// ============================================
+// External Data Sources
+// ============================================
+
+model LatviaPharmaRegistry {
+  id                    String   @id @default(cuid())
+  drugName              String
+  dosageForm            String
+  registrationNumber    String   @unique
+  activeIngredient      String
+  manufacturerName      String
+  manufacturerCountry   String
+  atcCode               String
+  issuanceProcedure     String
+  wholesalerName        String
+  wholesalerAddress     String   @db.Text
+  wholesalerLicense     String
+  permitValidity        String
+  lastUpdated           DateTime @default(now())
+  createdAt             DateTime @default(now())
+
+  @@index([atcCode])
+  @@index([manufacturerName])
+  @@index([wholesalerName])
+  @@index([drugName])
 }
